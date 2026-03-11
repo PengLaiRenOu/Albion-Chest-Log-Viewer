@@ -319,7 +319,7 @@
 
         function loadLog() {
             data = {};
-            const text = document.getElementById("log").value.replace('"',"").trim();
+            const text = document.getElementById("log").value.replaceAll('"',"").trim();
             if (!text) return;
 
             // 取得使用者設定的時間（並轉換為時間戳記，方便比較）
