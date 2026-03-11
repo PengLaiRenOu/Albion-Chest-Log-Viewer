@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Albion Log 分析器</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #1a1c23;
+            --card-bg: #2d303e;
+            --accent-color: #00bcd4;
+            --text-primary: #e0e0e0;
+            --text-secondary: #b0b0b0;
+            --border-color: #444;
+            --highlight: #f39c12;
+        }
+
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h2 {
+            color: var(--accent-color);
+            text-shadow: 0 0 10px rgba(0, 188, 212, 0.3);
+            margin-bottom: 30px;
+        }
+
+        /* 佈局容器 */
+        #mainContainer {
+            display: flex;
+            width: 100%;
+            max-width: 1200px;
+            gap: 30px;
+            position: relative;
+        }
+
+        /* 左側輸入區 */
+        #logContainer {
+            flex: 1;
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--border-color);
+        }
+
+        textarea {
+            width: 100%;
+            background: #12141a;
+            color: #50fa7b;
+            /* 程式碼風格的綠色 */
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            font-family: 'Courier New', monospace;
+            resize: vertical;
+            box-sizing: border-box;
+            outline: none;
+        }
+
+        .controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            background-color: var(--accent-color);
+            color: #fff;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background-color: #00e5ff;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 188, 212, 0.4);
+        }
+
+        select {
+            background: var(--card-bg);
+            color: white;
+            border: 1px solid var(--border-color);
+            padding: 8px;
+            border-radius: 6px;
+        }
+
+        /* 右側懸浮導覽 */
+        #playerNavContainer {
+            width: 180px;
+            position: fixed;
+            right: 20px;
+            /* 距離右側 20px */
+            top: 20px;
+            height: fit-content;
+            background: rgba(45, 48, 62, 0.9);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        #playerNavContainer h3 {
+            font-size: 1rem;
+            margin-top: 0;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+            color: var(--highlight);
+        }
+
+        #playerNav table {
+            width: 100%;
+        }
+
+        #playerNav a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            display: block;
+            padding: 5px 0;
+            transition: color 0.2s;
+        }
+
+        #playerNav a:hover {
+            color: var(--accent-color);
+        }
+
+        /* 結果展示區 */
+        #result {
+            width: 100%;
+            max-width: 1200px;
+            margin-top: 30px;
+        }
+
+        .player-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+            border-left: 5px solid var(--accent-color);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .player-card h3 {
+            margin-top: 0;
+            color: var(--highlight);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* 物品表格美化 */
+        table.items {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        table.items th {
+            background: rgba(0, 0, 0, 0.2);
+            color: var(--text-secondary);
+            text-align: left;
+            padding: 10px;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+        }
+
+        table.items td {
+            padding: 10px;
+            border-bottom: 1px solid #3d4150;
+        }
+
+        .item-img-cell {
+            width: 80px;
+        }
+
+        img {
+            width: 100px;
+            height: 100px;
+            border-radius: 8px;
+            background: #1a1c23;
+            border: 1px solid #444;
+        }
+
+        .status-tag {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .status-take {
+            background: #ff5555;
+            color: white;
+        }
+
+        .status-store {
+            background: #50fa7b;
+            color: #1a1c23;
+        }
+
+        .status-sum {
+            background: #8be9fd;
+            color: #1a1c23;
+        }
+
+        .amount-text {
+            font-family: 'Consolas', monospace;
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+
+        /* 捲軸美化 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-color);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h2>Albion Log 分析工具</h2>
+
+    <div id="mainContainer">
+        <div id="logContainer">
+            <textarea id="log" rows="12" placeholder="在此貼上遊戲內的 Log 數據..."></textarea>
+            <div class="controls">
+                <button onclick="loadLog()">解析 Log</button>
+                <select id="mode" onchange="showResult()">
+                    <option value="sum">分析：結餘總和</option>
+                    <option value="take">分析：拿取物品</option>
+                    <option value="store">分析：存入物品</option>
+                </select>
+            </div>
+        </div>
+
+    </div>
+    <div id="playerNavContainer">
+        <h3>玩家列表</h3>
+        <div id="playerNav"></div>
+    </div>
+
+    <div id="result">
+    </div>
+
+    <script>
+        let data = {};
+        let itemMap = {};
+
+        async function loadItemMap() {
+            try {
+                const res = await fetch("items_zh_tw_map.json");
+                itemMap = await res.json();
+            } catch (e) {
+                console.error("無法載入項目映射表", e);
+            }
+        }
+
+        loadItemMap();
+
+        function loadLog() {
+            data = {};
+            const text = document.getElementById("log").value.replaceAll("\"","").trim();
+            if (!text) return;
+
+            const lines = text.split("\n");
+
+            for (let i = 0; i < lines.length; i++) {
+                const p = lines[i].split("\t");
+                if (p.length < 6) continue;
+                if (p[2] == "垃圾") continue;
+                if (p[0] === "日期") continue;
+
+                const player = p[1];
+                const itemName = p[2];
+                const enchant = parseInt(p[3]);
+                const quality = parseInt(p[4]);
+                const amount = parseInt(p[5]);
+
+                const itemId = itemMap[itemName];
+                if (!itemId) continue;
+
+                const key = itemId + "|" + enchant + "|" + quality;
+                if (!data[player]) data[player] = {};
+
+                if (!data[player][key]) {
+                    data[player][key] = { itemId, enchant, quality, take: 0, store: 0 };
+                }
+
+                if (amount < 0) {
+                    data[player][key].take += Math.abs(amount);
+                } else {
+                    data[player][key].store += amount;
+                }
+            }
+            showResult();
+        }
+
+        function buildImageUrl(itemId, enchant, quality) {
+            let url = "https://render.albiononline.com/v1/item/" + itemId;
+            if (enchant != 0) url += "@" + enchant;
+            if (quality != 0) url += "?quality=" + quality;
+            return url;
+        }
+
+        function showResult() {
+            const mode = document.getElementById("mode").value;
+            const result = document.getElementById("result");
+            const nav = document.getElementById("playerNav");
+
+            result.innerHTML = "";
+            nav.innerHTML = "";
+
+            const players = Object.keys(data);
+            if (players.length === 0) return;
+
+            // 建立導覽清單
+            players.forEach(player => {
+                let hasItemInMode = Object.values(data[player]).some(d => {
+                    const sum = d.store - d.take;
+                    return (mode == "take" && d.take > 0) || (mode == "store" && d.store > 0) || (mode == "sum" && sum != 0);
+                });
+
+                if (hasItemInMode) {
+                    const a = document.createElement("a");
+                    a.href = "#player_" + player;
+                    a.textContent = "• " + player;
+                    nav.appendChild(a);
+                }
+            });
+
+            // 建立玩家卡片
+            for (let player in data) {
+                let hasItem = false;
+                const card = document.createElement("div");
+                card.className = "player-card";
+                card.id = "player_" + player;
+                card.innerHTML = `<h3>👤 ${player}</h3>`;
+
+                const table = document.createElement("table");
+                table.className = "items";
+                table.innerHTML = `<tr><th class="item-img-cell">物品</th><th>狀態</th><th>數量</th></tr>`;
+
+                for (let k in data[player]) {
+                    const d = data[player][k];
+                    const sum = d.store - d.take;
+                    let value = null;
+                    let actionClass = "";
+                    let actionText = "";
+
+                    if (mode == "take" && d.take > 0) { value = d.take; actionClass = "status-take"; actionText = "拿取"; }
+                    else if (mode == "store" && d.store > 0) { value = d.store; actionClass = "status-store"; actionText = "存入"; }
+                    else if (mode == "sum" && sum != 0) { 
+                        value = sum;
+                        if(sum < 0){
+                            actionClass = "status-take";
+                            actionText = "拿取"; 
+                        }
+                        else{
+                            actionClass = "status-store";
+                            actionText = "存入"; 
+                        }
+                    };
+
+                    if (value !== null) {
+                        hasItem = true;
+                        const tr = document.createElement("tr");
+                        tr.innerHTML = `
+                            <td class="item-img-cell"><img src="${buildImageUrl(d.itemId, d.enchant, d.quality)}" alt="item"></td>
+                            <td><span class="status-tag ${actionClass}">${actionText}</span></td>
+                            <td class="amount-text" style="color:${value < 0 ? '#ff5555' : '#50fa7b'}">${value}</td>
+                        `;
+                        table.appendChild(tr);
+                    }
+                }
+
+                if (hasItem) {
+                    card.appendChild(table);
+                    result.appendChild(card);
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>
