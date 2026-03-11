@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Albion Log 分析器</title>
+    <title>Albion Log 寶箱記錄查看器</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -242,6 +242,27 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #555;
         }
+
+        .time-filter {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .time-filter label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .time-filter input {
+            background: #12141a;
+            color: white;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 5px;
+        }
     </style>
 </head>
 
@@ -252,12 +273,22 @@
     <div id="mainContainer">
         <div id="logContainer">
             <textarea id="log" rows="12" placeholder="在此貼上遊戲內的 Log 數據..."></textarea>
+
+            <div class="time-filter-group">
+                <div class="filter-item">
+                    <label>起始時間</label>
+                    <input type="datetime-local" id="startTime">
+                    <label>結束時間</label>
+                    <input type="datetime-local" id="endTime">
+                </div>
+            </div>
+            <p style="color:red;">請使用 UTC 時間</p>
             <div class="controls">
                 <button onclick="loadLog()">解析 Log</button>
                 <select id="mode" onchange="showResult()">
-                    <option value="sum">分析：結餘總和</option>
                     <option value="take">分析：拿取物品</option>
                     <option value="store">分析：存入物品</option>
+                    <option value="sum">分析：結餘總和</option>
                 </select>
             </div>
         </div>
@@ -288,16 +319,32 @@
 
         function loadLog() {
             data = {};
-            const text = document.getElementById("log").value.replaceAll("\"","").trim();
+            const text = document.getElementById("log").value.trim();
             if (!text) return;
+
+            // 取得使用者設定的時間（並轉換為時間戳記，方便比較）
+            const startVal = document.getElementById("startTime").value;
+            const endVal = document.getElementById("endTime").value;
+            const startTime = startVal ? new Date(startVal).getTime() : null;
+            const endTime = endVal ? new Date(endVal).getTime() : null;
 
             const lines = text.split("\n");
 
             for (let i = 0; i < lines.length; i++) {
                 const p = lines[i].split("\t");
                 if (p.length < 6) continue;
-                if (p[2] == "垃圾") continue;
+                // 跳過 header
                 if (p[0] === "日期") continue;
+                // 找不到垃圾的圖片
+                if (p[2] == "垃圾") continue;
+
+                // --- 時間篩選邏輯 ---
+                // 假設 p[0] 的格式是 "2023-10-27 14:30:05"
+                const logTime = new Date(p[0]).getTime();
+
+                if (startTime && logTime < startTime) continue; // 早於起始時間，跳過
+                if (endTime && logTime > endTime) continue;     // 晚於結束時間，跳過
+                // ------------------
 
                 const player = p[1];
                 const itemName = p[2];
@@ -339,7 +386,9 @@
             result.innerHTML = "";
             nav.innerHTML = "";
 
-            const players = Object.keys(data);
+            const players = Object.keys(data).sort((a, b) => {
+                return a.toLowerCase().localeCompare(b.toLowerCase());
+            });
             if (players.length === 0) return;
 
             // 建立導覽清單
@@ -378,15 +427,15 @@
 
                     if (mode == "take" && d.take > 0) { value = d.take; actionClass = "status-take"; actionText = "拿取"; }
                     else if (mode == "store" && d.store > 0) { value = d.store; actionClass = "status-store"; actionText = "存入"; }
-                    else if (mode == "sum" && sum != 0) { 
+                    else if (mode == "sum" && sum != 0) {
                         value = sum;
-                        if(sum < 0){
+                        if (sum < 0) {
                             actionClass = "status-take";
-                            actionText = "拿取"; 
+                            actionText = "拿取";
                         }
-                        else{
+                        else {
                             actionClass = "status-store";
-                            actionText = "存入"; 
+                            actionText = "存入";
                         }
                     };
 
